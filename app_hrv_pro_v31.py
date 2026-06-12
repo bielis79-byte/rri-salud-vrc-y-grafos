@@ -209,7 +209,6 @@ def time_metrics(rr):
     }
 
 def psd_metrics(rr):
-  def psd_metrics(rr):
 
     ti, xi = interpolate_rr(
         rr,
@@ -260,16 +259,8 @@ def psd_metrics(rr):
         "LF": lf,
         "HF": hf,
         "TOTAL": total,
-        "LF_HF": lf/hf if hf > 0 else np.nan
+        "LF_HF": lf / hf if hf > 0 else np.nan
     }
-    def bp(lo, hi):
-        mask = (f>=lo) & (f<hi)
-        return np.trapezoid(pxx[mask], f[mask]) if np.any(mask) else 0
-    vlf = bp(0.0033, 0.04)
-    lf = bp(0.04, 0.15)
-    hf = bp(0.15, 0.40)
-    total = vlf + lf + hf
-    return {"VLF":vlf, "LF":lf, "HF":hf, "TOTAL":total, "LF_HF":lf/hf if hf>0 else np.nan}
 
 def _phi_apen(x, m, r):
     n = len(x)
