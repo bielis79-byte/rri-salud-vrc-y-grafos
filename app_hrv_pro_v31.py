@@ -9,7 +9,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from scipy import signal, sparse
 from scipy.sparse.linalg import spsolve
-from scipy.interpolate import make_interp_spline
+from scipy.interpolate import make_interp_spline, CubicSpline
 from scipy.spatial.distance import pdist, squareform
 
 st.set_page_config(page_title="VRC / HRV RRi Analyzer Pro v3.1", layout="wide")
@@ -169,14 +169,21 @@ def smoothness_priors_detrend(y, lam=500):
 
 def interpolate_rr(rr, fs=FS_INTERP, apply_lambda=False, lam=500):
     t = cumulative_time(rr)
+
     if len(t) < 5:
         return np.array([]), np.array([])
+
     t = t - t[0]
     x = rr.copy()
-    if apply_lambda:
-        x = smoothness_priors_detrend(x, lam)
+
     ti = np.arange(0, t[-1], 1/fs)
-    xi = np.interp(ti, t, x)
+
+    cs = CubicSpline(t, x, bc_type="natural")
+    xi = cs(ti)
+
+    if apply_lambda:
+        xi = smoothness_priors_detrend(xi, lam)
+
     return ti, xi
 
 # ============================================================
@@ -202,12 +209,59 @@ def time_metrics(rr):
     }
 
 def psd_metrics(rr):
-    ti, xi = interpolate_rr(rr, fs=FS_INTERP, apply_lambda=APPLY_LAMBDA["PSD"], lam=LAMBDA_DEFAULT)
+  def psd_metrics(rr):
+
+    ti, xi = interpolate_rr(
+        rr,
+        fs=FS_INTERP,
+        apply_lambda=APPLY_LAMBDA["PSD"],
+        lam=LAMBDA_DEFAULT
+    )
+
     if len(xi) < 32:
-        return {"VLF":np.nan, "LF":np.nan, "HF":np.nan, "TOTAL":np.nan, "LF_HF":np.nan}
-    xi_ms = xi*1000
+        return {
+            "VLF": np.nan,
+            "LF": np.nan,
+            "HF": np.nan,
+            "TOTAL": np.nan,
+            "LF_HF": np.nan
+        }
+
+    xi_ms = xi * 1000
     xi_ms = xi_ms - np.mean(xi_ms)
-    f, pxx = signal.welch(xi_ms, fs=FS_INTERP, nperseg=min(256, len(xi_ms)))
+
+    nperseg = int(256 * FS_INTERP)
+    nperseg = min(nperseg, len(xi_ms))
+
+    noverlap = int(0.5 * nperseg)
+
+    f, pxx = signal.welch(
+        xi_ms,
+        fs=FS_INTERP,
+        window="hann",
+        nperseg=nperseg,
+        noverlap=noverlap,
+        detrend=False,
+        scaling="density"
+    )
+
+    def bp(lo, hi):
+        mask = (f >= lo) & (f < hi)
+        return np.trapezoid(pxx[mask], f[mask]) if np.any(mask) else 0
+
+    vlf = bp(0.0033, 0.04)
+    lf = bp(0.04, 0.15)
+    hf = bp(0.15, 0.40)
+
+    total = vlf + lf + hf
+
+    return {
+        "VLF": vlf,
+        "LF": lf,
+        "HF": hf,
+        "TOTAL": total,
+        "LF_HF": lf/hf if hf > 0 else np.nan
+    }
     def bp(lo, hi):
         mask = (f>=lo) & (f<hi)
         return np.trapezoid(pxx[mask], f[mask]) if np.any(mask) else 0
