@@ -313,35 +313,60 @@ def d2_calc(x, emb_dim=2, tau=1):
     if np.sum(mask)<5: return np.nan
     return np.polyfit(np.log(radii[mask]),np.log(C[mask]),1)[0]
 
-def rqa_calc(x, emb_dim=2, tau=1, radius_ratio=0.2, l_min=2):
-    x=np.asarray(x,float)
-    n=len(x)-(emb_dim-1)*tau
-    if n<20:
-        return {"REC":np.nan,"DET":np.nan,"Lmean":np.nan,"Lmax":np.nan,"ShanEn":np.nan}
-    X=np.array([x[i:i+emb_dim*tau:tau] for i in range(n)])
-    D=squareform(pdist(X))
-    radius=radius_ratio*np.std(D)
-    R=(D<=radius).astype(int)
-    np.fill_diagonal(R,0)
-    rec=100*R.sum()/(n*n-n)
-    lens=[]
-    for k in range(-n+1,n):
-        diag=np.diag(R,k=k); c=0
-        for val in diag:
-            if val==1:
-                c+=1
-            else:
-                if c>=l_min: lens.append(c)
-                c=0
-        if c>=l_min: lens.append(c)
-    if len(lens)==0:
-        return {"REC":rec,"DET":0,"Lmean":0,"Lmax":0,"ShanEn":0}
-    lens=np.asarray(lens)
-    det=100*lens.sum()/R.sum() if R.sum()>0 else 0
-    vals, counts = np.unique(lens, return_counts=True)
-    p=counts/counts.sum()
-    return {"REC":rec,"DET":det,"Lmean":np.mean(lens),"Lmax":np.max(lens),"ShanEn":-np.sum(p*np.log(p))}
+def rqa_calc(x, emb_dim=2, tau=1, target_rec=0.05, l_min=2):
+    x = np.asarray(x, dtype=float)
+    n = len(x) - (emb_dim - 1) * tau
 
+    if n < 20:
+        return {"REC": np.nan, "DET": np.nan, "Lmean": np.nan, "Lmax": np.nan, "ShanEn": np.nan}
+
+    X = np.array([x[i:i + emb_dim * tau:tau] for i in range(n)])
+    D = squareform(pdist(X))
+
+    # Usar un umbral adaptativo para obtener una recurrencia aproximada del 5%
+    valid = D[np.triu_indices_from(D, k=1)]
+    valid = valid[valid > 0]
+
+    if len(valid) == 0:
+        return {"REC": np.nan, "DET": np.nan, "Lmean": np.nan, "Lmax": np.nan, "ShanEn": np.nan}
+
+    radius = np.percentile(valid, target_rec * 100)
+
+    R = (D <= radius).astype(int)
+    np.fill_diagonal(R, 0)
+
+    rec = 100 * R.sum() / (n * n - n)
+
+    lens = []
+    for k in range(-n + 1, n):
+        diag = np.diag(R, k=k)
+        c = 0
+        for val in diag:
+            if val == 1:
+                c += 1
+            else:
+                if c >= l_min:
+                    lens.append(c)
+                c = 0
+        if c >= l_min:
+            lens.append(c)
+
+    if len(lens) == 0:
+        return {"REC": rec, "DET": 0, "Lmean": 0, "Lmax": 0, "ShanEn": 0}
+
+    lens = np.asarray(lens)
+    det = 100 * lens.sum() / R.sum() if R.sum() > 0 else 0
+
+    vals, counts = np.unique(lens, return_counts=True)
+    p = counts / counts.sum()
+
+    return {
+        "REC": rec,
+        "DET": det,
+        "Lmean": np.mean(lens),
+        "Lmax": np.max(lens),
+        "ShanEn": -np.sum(p * np.log(p))
+    }
 # ============================================================
 # HVG
 # ============================================================
