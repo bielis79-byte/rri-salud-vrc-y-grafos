@@ -210,7 +210,7 @@ def psd_metrics(rr):
     f, pxx = signal.welch(xi_ms, fs=FS_INTERP, nperseg=min(256, len(xi_ms)))
     def bp(lo, hi):
         mask = (f>=lo) & (f<hi)
-        return np.trapz(pxx[mask], f[mask]) if np.any(mask) else 0
+        return return np.trapezoid(pxx[mask], f[mask]) if np.any(mask) else 0(pxx[mask], f[mask]) if np.any(mask) else 0
     vlf = bp(0.0033, 0.04)
     lf = bp(0.04, 0.15)
     hf = bp(0.15, 0.40)
