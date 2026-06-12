@@ -313,7 +313,7 @@ def d2_calc(x, emb_dim=2, tau=1):
     if np.sum(mask)<5: return np.nan
     return np.polyfit(np.log(radii[mask]),np.log(C[mask]),1)[0]
 
-def rqa_calc(x, emb_dim=2, tau=1, radius_ratio=0.2, l_min=2):
+def rqa_calc(x, emb_dim=10, tau=1, l_min=2):
     x = np.asarray(x, dtype=float)
     n = len(x) - (emb_dim - 1) * tau
 
@@ -323,9 +323,10 @@ def rqa_calc(x, emb_dim=2, tau=1, radius_ratio=0.2, l_min=2):
     X = np.array([x[i:i + emb_dim * tau:tau] for i in range(n)])
     D = squareform(pdist(X))
 
-    radius = radius_ratio * np.std(D)
-    R = (D <= radius).astype(int)
+    # Kubios: r = sqrt(m) * SD de la serie RR
+    radius = np.sqrt(emb_dim) * np.std(x, ddof=1)
 
+    R = (D <= radius).astype(int)
     np.fill_diagonal(R, 0)
 
     rec = 100 * R.sum() / (n * n - n)
